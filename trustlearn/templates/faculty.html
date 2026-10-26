@@ -1,0 +1,25 @@
+{# Name: Aryan Zope
+PRN: 26070122053 #}
+{% extends "base.html" %}
+{% block title %}Faculty{% endblock %}
+{% block body %}
+<h1>Support alerts</h1>
+<p class="mute">These are suggestions, not judgments. Only students who opted in appear, identified by pseudonymous ID. Nothing happens until you record a decision.</p>
+{% for a in alerts %}
+<div class="card accented">
+  <div class="row"><b><code>{{ a.pid }}</code></b><span class="tag">{{ a.dept }}</span>
+    {% if a.decision %}<span class="tag warn">Decided: {{ a.decision.decision }}</span>{% endif %}</div>
+  <p style="margin-bottom:.2rem">Why this student was flagged:</p>
+  <ul style="margin-top:0">{% for r in a.reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+  {% if a.decision %}<p class="mute">Your note: {{ a.decision.note }}</p>{% endif %}
+  <form method="post" action="{{ url_for('decide') }}" class="row">
+    <input type="hidden" name="pid" value="{{ a.pid }}">
+    <select name="decision" aria-label="Decision"><option>Reach out</option><option>Keep monitoring</option><option>Dismiss alert</option></select>
+    <input type="text" name="note" placeholder="Reason for your decision" aria-label="Reason for your decision" required>
+    <button>Record decision</button>
+  </form>
+</div>
+{% else %}
+<div class="card"><p class="mute">No support alerts right now.</p></div>
+{% endfor %}
+{% endblock %}

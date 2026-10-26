@@ -1,0 +1,179 @@
+{# Name: Aryan Zope
+PRN: 26070122053 #}
+{% extends "base.html" %}
+{% block title %}Student{% endblock %}
+{% block body %}
+<h1>My learning space</h1>
+
+<div class="subject-tabs">
+  {% for key, subj in subjects.items() %}
+  <a href="{{ url_for('student', subject=key) }}" class="{{ key }}{{ ' on' if key == subject }}">{{ subj.label }}</a>
+  {% endfor %}
+</div>
+
+<div class="card accented">
+  <h2>My privacy controls</h2>
+  <p class="mute">Your pseudonymous ID is <code>{{ pid }}</code>. Your name and roll number are never stored with your activity. The AI tutor runs through a server-side key you never see.</p>
+  <form method="post" action="{{ url_for('consent') }}">
+    <input type="hidden" name="subject" value="{{ subject }}">
+    <label><input type="checkbox" name="track" {{ 'checked' if s.track }}> Record my practice activity (needed for my self-reliance score)</label><br>
+    <label><input type="checkbox" name="share" {{ 'checked' if s.share }}> Let faculty see support alerts about me</label><br><br>
+    <button>Save my choices</button>
+  </form>
+</div>
+
+<div class="card accented">
+  <h2>My self-reliance score</h2>
+  {% if score is not none %}
+    <div class="score">{{ score }}<small class="mute"> / 100</small></div>
+    <div class="bar"><i style="width:{{ score }}%"></i></div>
+    <p class="mute">Higher means you solved more questions with fewer hints. Revealed answers score zero.</p>
+    {% if subj_scores %}
+    <div class="mini-scores">
+      {% for key, subj in subjects.items() %}
+      {% if key in subj_scores %}
+      <div class="mini-score {{ key }}"><span class="mute">{{ subj.label }}</span><b>{{ subj_scores[key] }}</b></div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% else %}
+    <p class="mute">Solve a question below to see your score.{% if not s.track %} Tracking is off, so nothing is being recorded.{% endif %}</p>
+  {% endif %}
+</div>
+
+<div class="card accented" id="ai-widget">
+  <h2>AI study assistant</h2>
+  <p class="mute">Runs through TrustLearn's server, not a third party in your browser. Questions and summaries are encrypted before they're stored.</p>
+  <div class="row" style="margin-bottom:.8rem">
+    <button type="button" id="tab-ask" class="ai-tab on">Ask a question</button>
+    <button type="button" id="tab-sum" class="ai-tab alt">Summarize text</button>
+  </div>
+
+  <div id="pane-ask">
+    <div class="row">
+      <input type="text" id="ask-input" placeholder="Ask about today's topic..." style="flex:1;min-width:220px" aria-label="Ask the AI tutor a question">
+      <button type="button" id="ask-send">Ask</button>
+    </div>
+    <div id="ask-status" class="mute" style="margin-top:.5rem"></div>
+    <div id="ask-answer" class="ai-answer" hidden></div>
+  </div>
+
+  <div id="pane-sum" hidden>
+    <textarea id="sum-input" rows="5" style="width:100%" placeholder="Paste a paragraph or two to summarize..." aria-label="Text to summarize"></textarea>
+    <div class="row" style="margin-top:.5rem">
+      <button type="button" id="sum-send">Summarize</button>
+    </div>
+    <div id="sum-status" class="mute" style="margin-top:.5rem"></div>
+    <div id="sum-answer" class="ai-answer" hidden></div>
+  </div>
+
+  {% if chat %}
+  <details style="margin-top:1rem">
+    <summary class="mute" style="cursor:pointer">My chat history ({{ chat|length }})</summary>
+    {% for c in chat %}
+    <div class="chat-entry"><p><b>You:</b> {{ c.q }}</p><p><b>Tutor:</b> {{ c.a }}</p><p class="mute">{{ c.time }}</p></div>
+    {% endfor %}
+    <form method="post" action="{{ url_for('clear_chat') }}"><input type="hidden" name="subject" value="{{ subject }}"><button class="alt">Delete my chat history</button></form>
+  </details>
+  {% endif %}
+</div>
+
+<h2>Practice: {{ subjects[subject].label }}</h2>
+{% for c in cards %}
+<div class="card">
+  <b>Question {{ c.id }}.</b> {{ c.q }}
+  {% if c.st.done %}
+    <p><span class="tag good">{{ 'Answer: ' ~ c.ans if c.st.revealed else 'Solved by you' }}</span></p>
+  {% else %}
+    <form method="post" action="{{ url_for('practice', subject=subject, qid=c.id, action='attempt') }}" class="row" style="margin:.6rem 0">
+      <input type="text" name="answer" placeholder="Your attempt" aria-label="Your answer to question {{ c.id }}" required>
+      <button>Submit attempt</button>
+    </form>
+    <div class="row">
+      <form method="post" action="{{ url_for('practice', subject=subject, qid=c.id, action='hint') }}"><button class="alt">Get a hint ({{ c.st.hints }} of {{ c.hints|length }} used)</button></form>
+      <form method="post" action="{{ url_for('practice', subject=subject, qid=c.id, action='reveal') }}"><button class="alt">Reveal answer</button></form>
+    </div>
+  {% endif %}
+  {% for h in c.hints[:c.st.hints] %}<p class="mute">Hint {{ loop.index }}: {{ h }}</p>{% endfor %}
+  {% if c.st.tries and not c.st.done %}<p class="mute">Attempts so far: {{ c.st.tries }}</p>{% endif %}
+</div>
+{% endfor %}
+
+<div class="card">
+  <h2>Exactly what is collected about me</h2>
+  {% if s.events %}
+  <div class="table-wrap"><table>
+    <tr><th>Subject</th><th>Question</th><th>Hints used</th><th>Answer revealed</th><th>Days ago</th><th>Score</th></tr>
+    {% for e in s.events %}<tr><td>{{ subjects[e.subject].label if e.subject in subjects else e.subject }}</td><td>{{ e.qid }}</td><td>{{ e.hints }}</td><td>{{ 'Yes' if e.revealed else 'No' }}</td><td>{{ e.days_ago }}</td><td>{{ e.score }}</td></tr>{% endfor %}
+  </table></div>
+  <form method="post" action="{{ url_for('delete_data') }}" style="margin-top:.8rem"><input type="hidden" name="subject" value="{{ subject }}"><button class="alt">Delete all my activity</button></form>
+  {% else %}
+  <p class="mute">Nothing is recorded about you right now.</p>
+  {% endif %}
+</div>
+
+<style>
+.ai-tab{opacity:.65} .ai-tab.on{opacity:1}
+.ai-answer{margin-top:.8rem;background:var(--accent-soft);border-radius:8px;padding:.8rem 1rem;white-space:pre-wrap}
+.chat-entry{border-top:1px solid var(--line);padding:.6rem 0}
+.chat-entry p{margin:.2rem 0}
+</style>
+<script>
+(function(){
+  function wireTabs(){
+    var tabAsk = document.getElementById('tab-ask'), tabSum = document.getElementById('tab-sum');
+    var paneAsk = document.getElementById('pane-ask'), paneSum = document.getElementById('pane-sum');
+    function setActive(which){
+      var askOn = which === 'ask';
+      tabAsk.className = askOn ? 'ai-tab on' : 'ai-tab alt';
+      tabSum.className = askOn ? 'ai-tab alt' : 'ai-tab on';
+      paneAsk.hidden = !askOn; paneSum.hidden = askOn;
+    }
+    tabAsk.addEventListener('click', function(){ setActive('ask'); });
+    tabSum.addEventListener('click', function(){ setActive('sum'); });
+  }
+
+  async function post(url, body){
+    var res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    var data = await res.json().catch(function(){ return {}; });
+    if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+    return data;
+  }
+
+  function wireAsk(){
+    var input = document.getElementById('ask-input'), btn = document.getElementById('ask-send');
+    var status = document.getElementById('ask-status'), answer = document.getElementById('ask-answer');
+    async function send(){
+      var q = input.value.trim();
+      if (!q) { status.textContent = 'Type a question first.'; return; }
+      btn.disabled = true; status.textContent = 'Thinking...'; answer.hidden = true;
+      try {
+        var data = await post('/api/ask', {question: q});
+        answer.textContent = data.answer; answer.hidden = false; status.textContent = '';
+      } catch (err) { status.textContent = err.message; }
+      btn.disabled = false;
+    }
+    btn.addEventListener('click', send);
+    input.addEventListener('keydown', function(e){ if (e.key === 'Enter') send(); });
+  }
+
+  function wireSummarize(){
+    var input = document.getElementById('sum-input'), btn = document.getElementById('sum-send');
+    var status = document.getElementById('sum-status'), answer = document.getElementById('sum-answer');
+    btn.addEventListener('click', async function(){
+      var t = input.value.trim();
+      if (!t) { status.textContent = 'Paste some text first.'; return; }
+      btn.disabled = true; status.textContent = 'Summarizing...'; answer.hidden = true;
+      try {
+        var data = await post('/api/summarize', {text: t});
+        answer.textContent = data.summary; answer.hidden = false; status.textContent = '';
+      } catch (err) { status.textContent = err.message; }
+      btn.disabled = false;
+    });
+  }
+
+  wireTabs(); wireAsk(); wireSummarize();
+})();
+</script>
+{% endblock %}

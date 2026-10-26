@@ -1,0 +1,6 @@
+# Name: Aryan Zope
+# PRN: 26070122053
+Flask>=3.0
+requests>=2.31
+cryptography>=42.0
+python-dotenv>=1.0
